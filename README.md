@@ -1,2 +1,5 @@
-# ocviewer
-Simple browser app to analyze clusters
+
+Run with:
+
+$ source .venv/bin/activate
+$ streamlit run parquet_plotter.py
