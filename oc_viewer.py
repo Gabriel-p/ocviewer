@@ -207,15 +207,38 @@ if df is not None:
             st.session_state.sel_idx = []
         if "sel_history" not in st.session_state:
             st.session_state.sel_history = []
+        if "view_reset_ctr" not in st.session_state:
+            st.session_state.view_reset_ctr = 0
 
-        c_show, c_clear, c_revert = st.columns([3, 1, 1])
+        c_show, c_prob, c_clear, c_revert, c_download = st.columns([2, 1.5, 1, 1, 1.5])
         show_only_sel = c_show.checkbox(
             "Show only selected points", value=True, key="show_only_sel"
         )
+
+        def _on_prob_change():
+            st.session_state.sel_history.append(st.session_state.sel_idx)
+            st.session_state.sel_idx = []
+            st.session_state.reset_ctr += 1
+            st.session_state.view_reset_ctr += 1
+
+        if "probs" in df.columns:
+            min_prob = c_prob.number_input(
+                "Min probability",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.0,
+                step=0.05,
+                key="min_prob",
+                on_change=_on_prob_change,
+            )
+            if min_prob > 0:
+                df = df[df["probs"] >= min_prob].reset_index(drop=True)
+
         if c_clear.button("Clear selection", use_container_width=True):
             st.session_state.sel_history.append(st.session_state.sel_idx)
             st.session_state.sel_idx = []
             st.session_state.reset_ctr += 1
+            st.session_state.view_reset_ctr += 1
             st.rerun()
         if c_revert.button(
             "Revert last selection",
@@ -225,6 +248,16 @@ if df is not None:
             st.session_state.sel_idx = st.session_state.sel_history.pop()
             st.session_state.reset_ctr += 1
             st.rerun()
+
+        _use_sel_dl = show_only_sel and st.session_state.sel_idx
+        download_df = df.iloc[st.session_state.sel_idx] if _use_sel_dl else df
+        c_download.download_button(
+            "Download CSV",
+            data=download_df.to_csv(index=False).encode(),
+            file_name="oc_viewer_filtered.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
 
         def make_plot(
             key, default_x, default_y, default_color=None, default_invert=False
@@ -241,10 +274,15 @@ if df is not None:
                 color_opts.index(default_color) if default_color in color_opts else 0
             )
 
-            x_col = c1.selectbox("X axis", numeric_cols, index=x_idx, key=f"x_{key}")
-            y_col = c2.selectbox("Y axis", numeric_cols, index=y_idx, key=f"y_{key}")
+            vctr = st.session_state.view_reset_ctr
+            x_col = c1.selectbox(
+                "X axis", numeric_cols, index=x_idx, key=f"x_{key}_{vctr}"
+            )
+            y_col = c2.selectbox(
+                "Y axis", numeric_cols, index=y_idx, key=f"y_{key}_{vctr}"
+            )
             color_col = c3.selectbox(
-                "Color by", color_opts, index=color_idx, key=f"c_{key}"
+                "Color by", color_opts, index=color_idx, key=f"c_{key}_{vctr}"
             )
             cmap = c4.selectbox(
                 "Colormap",
@@ -260,9 +298,11 @@ if df is not None:
                     "Jet",
                     "Rainbow",
                 ],
-                key=f"cmap_{key}",
+                key=f"cmap_{key}_{vctr}",
             )
-            invert_y = c5.checkbox("Invert Y", value=default_invert, key=f"inv_{key}")
+            invert_y = c5.checkbox(
+                "Invert Y", value=default_invert, key=f"inv_{key}_{vctr}"
+            )
 
             use_selection = show_only_sel and st.session_state.sel_idx
             plot_df = df.iloc[st.session_state.sel_idx] if use_selection else df
@@ -288,8 +328,8 @@ if df is not None:
                 title=f"{y_col} vs {x_col}",
             )
             fig.update_traces(
-                marker=dict(size=marker_size, line=dict(width=0.5, color="grey")),
-                selector=dict(mode="markers"),
+                marker={"size": marker_size, "line": {"width": 0.5, "color": "grey"}},
+                selector={"mode": "markers"},
             )
             fig.update_layout(width=600, height=600)
             if invert_y:
@@ -301,11 +341,11 @@ if df is not None:
                     x=sel[x_col],
                     y=sel[y_col],
                     mode="markers",
-                    marker=dict(
-                        size=10,
-                        color="rgba(0,0,0,0)",
-                        line=dict(width=2, color="black"),
-                    ),
+                    marker={
+                        "size": 10,
+                        "color": "rgba(0,0,0,0)",
+                        "line": {"width": 2, "color": "black"},
+                    },
                     showlegend=False,
                     hoverinfo="skip",
                 )
@@ -348,4 +388,6 @@ if df is not None:
                     st.rerun()
                 break
 else:
-    st.info("Upload a CSV/Parquet file or load a cluster from the UCC catalogue to begin.")
+    st.info(
+        "Upload a CSV/Parquet file or load a cluster from the UCC catalogue to begin."
+    )
