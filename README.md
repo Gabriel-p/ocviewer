@@ -1,6 +1,8 @@
 
-Simple [Streamlit](https://streamlit.io/) app to visualize cluster objects.
+Simple [Streamlit](https://streamlit.io/) app to visualize stellar cluster data and inspect their
+distributions and properties interactively.
 
+<img src="fig1.png" alt="Cluster viewer" width="900">
 
 Create environment and install dependencies with:
 
